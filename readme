@@ -1,0 +1,1 @@
+Get MATLAB to read the data from txt file, and the transmit them to simulink. After simulation in simulink, transmit the output data to workspace and write them to a new txt file. 
