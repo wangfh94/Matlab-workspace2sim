@@ -1,0 +1,75 @@
+%% M函数对simulink数据的读写与控制
+%% 自动读取某个文件夹中生成的文件，每次有新的文件生成时，都会读取一次。
+%% 读取后的数据作为simulink的输入，计算后的输出数据保存到workspace中，并根据需求编程为6DOF格式。
+%% 王芳涵 20190829
+
+clear;clc;close all;
+TS = 10000;%循环次数
+qua_buffer=[];
+for II = 1:TS
+    clc;clearvars -except qua_buffer II TS;close all
+    input_path='D:\14-船舶运动模型\workspace数据自动读取\input\test1';
+    output_path='D:\14-船舶运动模型\workspace数据自动读取\output';
+    fileread=dir(fullfile(strcat(input_path,'\','*.txt')));
+    file_quantity=length(fileread);
+    qua_buffer=[qua_buffer
+        file_quantity];
+    if file_quantity==0
+        break%当文件夹中还没数据生成时，不做计算，重新检测
+    elseif file_quantity==1
+         qua_buffer=[0
+             qua_buffer];
+    end
+       qua_diff=qua_buffer(end)-qua_buffer(end-1);
+        if qua_diff==1% 当检测到有新的动力载荷数据文件
+            I = qua_buffer(end);
+            input_data=importdata(strcat(input_path,'\',fileread(I).name));
+            input_x=[1 input_data(1)];
+            input_y=[1 input_data(2)];
+            sim('test');
+            %% 提取simulink的output参数，自动编写成udf保存。
+%             fp=fopen('6dof.txt','a');
+            fp=fopen(['D:\14-船舶运动模型\workspace数据自动读取\output\6dof',num2str(I),'.txt'],'A');
+            fprintf(fp,'#include "udf.h"\r\n');
+            fprintf(fp,'#define pi 3.14159265\r\n');
+            fprintf(fp,'DEFINE_CG_MOTION(name,dt,vel,omega,time,dtime)\r\n');
+            fprintf(fp,'{\r\n');
+            fprintf(fp,'%7s%d%s','vel[0]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'%7s%d%s','vel[1]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'%7s%d%s','vel[2]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'%9s%d%s','omega[0]=',output);
+            fprintf(fp,';\r\n');        
+            fprintf(fp,'%9s%d%s','omega[1]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'%9s%d%s','omega[2]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'}\r\n');
+            fprintf(fp,'DEFINE_SDOF_PROPERTIES(sdof_properties, prop, dt, time, dtime)\r\n{\r\n');
+            fprintf(fp,'%16s%d%s','prop[SDOF_MASS]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'%16s%d%s','prop[SDOF_MASS]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'%15s%d%s','prop[SDOF_IXX]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'%15s%d%s','prop[SDOF_IYY]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'%15s%d%s','prop[SDOF_IZZ]=',output);
+            fprintf(fp,';\r\n');
+            fprintf(fp,'prop[SDOF_ZERO_TRANS_X] = FALSE;\r\n');
+            fprintf(fp,'prop[SDOF_ZERO_TRANS_Y] = FALSE;\r\n');
+            fprintf(fp,'prop[SDOF_ZERO_TRANS_Z] = FALSE;\r\n');
+            fprintf(fp,'prop[SDOF_ZERO_ROT_X] = FALSE;\r\n');
+            fprintf(fp,'prop[SDOF_ZERO_ROT_Y] = FALSE;\r\n');
+            fprintf(fp,'prop[SDOF_ZERO_ROT_Z] = FALSE;\r\n');
+            fprintf(fp,'%s','printf ("\n updated 6DOF properties");');
+            fprintf(fp,'\r\n}');
+            fclose(fp);
+            
+        elseif qua_diff==0
+            continue% 当没有检测到有新的文件生成时,跳出循环
+        end
+        pause(5)%暂停一段时间，留给fluent计算
+end
